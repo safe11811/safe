@@ -4,8 +4,8 @@
 // Configure YouTube fetching (optional)
 const CONFIG = {
   GITHUB_USER: 'safe11811',
-  YOUTUBE_API_KEY: 'AIzaSyCUF4-ljW63HGv_CPt7H84LiTX3PnI3-1k',      // OPTIONAL: set your API key to enable YouTube fetching
-  YOUTUBE_CHANNEL_ID: 'UCdGAezwvTu0T2w83E2RopxA'    // OPTIONAL: set your channel's UC... id (not the @ handle)
+  YOUTUBE_API_KEY: process.env.YOUTUBE_API_KEY || '',   // loaded from .env
+  YOUTUBE_CHANNEL_ID: process.env.YOUTUBE_CHANNEL_ID || ''
 };
 
 document.addEventListener('DOMContentLoaded', () => {
