@@ -1,78 +1,12 @@
 // Single-page terminal-style portfolio (About+terminal integrated)
 // - Contact section removed
 // - Logo fixed and sketch image included in About
-// NOTE: YouTube API key is NOT hardcoded here. See getYouTubeApiKey() for how the key is
-// read from a secret injection (meta tag, window.__SAFE_SECRETS, or serverless proxy).
+// Configure YouTube fetching (optional)
 const CONFIG = {
   GITHUB_USER: 'safe11811',
-  // Do NOT put your API key here. Leave null and inject it as a secret at build/runtime.
-  YOUTUBE_API_KEY: null,
-  YOUTUBE_CHANNEL_ID: 'UCdGAezwvTu0T2w83E2RopxA' // your UC... channel id
+  YOUTUBE_API_KEY: 'AIzaSyCUF4-ljW63HGv_CPt7H84LiTX3PnI3-1k',      // OPTIONAL: set your API key to enable YouTube fetching
+  YOUTUBE_CHANNEL_ID: 'UCdGAezwvTu0T2w83E2RopxA'    // OPTIONAL: set your channel's UC... id (not the @ handle)
 };
-
-/*
-  How the YouTube API key is resolved at runtime (in order):
-  1) window.__SAFE_SECRETS.YOUTUBE_API_KEY - injected by your build/deploy system (recommended)
-  2) <meta name="yt-api-key" content="..."> in index.html (e.g., injected at deploy)
-  3) If neither exists, the script will attempt to call a server-side proxy at /api/youtube
-     (you must implement the proxy as a serverless function and store the key server-side).
-  If none of these are available the site falls back to a friendly link to the channel.
-*/
-
-function getYouTubeApiKey() {
-  try {
-    // 1) Window-injected secrets (e.g., your host injects a small object at runtime)
-    if (typeof window !== 'undefined' && window.__SAFE_SECRETS && window.__SAFE_SECRETS.YOUTUBE_API_KEY) {
-      return String(window.__SAFE_SECRETS.YOUTUBE_API_KEY).trim() || null;
-    }
-
-    // 2) Meta tag injection (can be written at deploy time)
-    const meta = document.querySelector('meta[name="yt-api-key"]');
-    if (meta && meta.content) return String(meta.content).trim() || null;
-
-    // 3) CONFIG fallback (should be null in committed code)
-    if (CONFIG.YOUTUBE_API_KEY) return String(CONFIG.YOUTUBE_API_KEY).trim() || null;
-  } catch (e) {
-    // ignore
-  }
-  return null;
-}
-
-// Helper: call server-side proxy to fetch videos if client-side key is not provided.
-// Your serverless function should accept query params: channelId, maxResults and return
-// the same simplified structure as fetchLatestYouTubeVideos returns.
-async function fetchYouTubeViaProxy(channelId, maxResults = 3) {
-  const proxyUrls = [
-    `/api/youtube?channelId=${encodeURIComponent(channelId)}&maxResults=${encodeURIComponent(maxResults)}`,
-    `/.netlify/functions/youtube?channelId=${encodeURIComponent(channelId)}&maxResults=${encodeURIComponent(maxResults)}`
-  ];
-
-  for (const url of proxyUrls) {
-    try {
-      const res = await fetch(url);
-      if (!res.ok) continue;
-      const json = await res.json();
-      // If your proxy returns the items array, normalize it to the shape below
-      if (Array.isArray(json.items)) {
-        return json.items.map(it => {
-          const snip = it.snippet || {};
-          return {
-            id: snip.resourceId ? snip.resourceId.videoId : (it.id && it.id.videoId) || it.id,
-            title: snip.title || it.title || '',
-            description: snip.description || it.description || '',
-            thumb: (snip.thumbnails && (snip.thumbnails.medium || snip.thumbnails.default)) ? (snip.thumbnails.medium.url || snip.thumbnails.default.url) : '',
-            publishedAt: snip.publishedAt || it.publishedAt || ''
-          };
-        });
-      }
-      // If proxy returns already-normalized array
-      if (Array.isArray(json)) return json;
-    } catch (err) {
-      // try next proxy
-    }
-  }
-  throw new Error('No proxy available or proxy failed');
-}
 
 document.addEventListener('DOMContentLoaded', () => {
   // Elements
@@ -86,7 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const miniBody = document.getElementById('miniBody');
   const miniCmd = document.getElementById('miniCmd');
 
-  if (yearEl) yearEl.textContent = new Date().getFullYear();
+  yearEl.textContent = new Date().getFullYear();
 
   // Typing intro
   const introLines = [
@@ -174,33 +108,22 @@ document.addEventListener('DOMContentLoaded', () => {
     if (ghSection) ghSection.innerHTML = `<div class="muted small">Failed to load GitHub repos: ${err.message}</div>`;
   });
 
-  // PROJECTS: YouTube optional (resolve key from secret or proxy)
-  (async function loadYouTube() {
-    if (!ytSection) return;
-    const channelId = CONFIG.YOUTUBE_CHANNEL_ID;
-    const apiKey = getYouTubeApiKey();
-
-    if (apiKey) {
-      try {
-        const videos = await fetchLatestYouTubeVideos(apiKey, channelId, 3);
-        renderYTVideos(videos, ytSection);
-        return;
-      } catch (err) {
-        // if client-side key failed, fall through to try proxy
-        console.warn('YouTube client fetch failed:', err);
-      }
-    }
-
-    // Try server-side proxy if no client key or client fetch failed
-    try {
-      const videos = await fetchYouTubeViaProxy(channelId, 3);
-      renderYTVideos(videos, ytSection);
-      return;
-    } catch (err) {
-      // final fallback UI
-      ytSection.innerHTML = `<div class="media-card"><div style="padding:10px"><p class="muted small">YouTube videos will appear here when a YouTube API key is provided (via secret injection) or when a server-side proxy is available.</p><a class="social-link" href="https://www.youtube.com/@safe11881" target="_blank" rel="noopener">Open channel</a></div></div>`;
-    }
-  })();
+  // PROJECTS: YouTube optional
+  if (CONFIG.YOUTUBE_API_KEY && CONFIG.YOUTUBE_CHANNEL_ID) {
+    fetchLatestYouTubeVideos(CONFIG.YOUTUBE_API_KEY, CONFIG.YOUTUBE_CHANNEL_ID, 3)
+      .then(videos => renderYTVideos(videos, ytSection))
+      .catch(err => {
+        if (ytSection) ytSection.innerHTML = `<div class="muted small">Failed to load YouTube videos: ${err.message} — <a href="https://www.youtube.com/@safe11881" target="_blank">Open channel</a></div>`;
+      });
+  } else {
+    if (ytSection) ytSection.innerHTML = `
+      <div class="media-card">
+        <div style="padding:10px">
+          <p class="muted small">YouTube videos will appear here when you provide a YouTube API key and channel ID in script.js.</p>
+          <a class="social-link" href="https://www.youtube.com/@safe11881" target="_blank" rel="noopener">Open channel</a>
+        </div>
+      </div>`;
+  }
 
   // -------------------- About terminal command handler --------------------
   function handleAboutCommand(raw) {
