@@ -4,8 +4,8 @@
 // Configure YouTube fetching (optional)
 const CONFIG = {
   GITHUB_USER: 'safe11811',
-  YOUTUBE_API_KEY: process.env.YOUTUBE_API_KEY || '',   // loaded from .env
-  YOUTUBE_CHANNEL_ID: process.env.YOUTUBE_CHANNEL_ID || ''
+  YOUTUBE_API_KEY: 'AIzaSyCUF4-ljW63HGv_CPt7H84LiTX3PnI3-1k',   // loaded from .env
+  YOUTUBE_CHANNEL_ID: 'UCdGAezwvTu0T2w83E2RopxA'
 };
 
 document.addEventListener('DOMContentLoaded', () => {
